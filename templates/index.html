@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sketch2Video with Gemini & Veo 3</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background-color: #f4f4f4; min-height: 100vh; box-sizing: border-box; }
+        h1 { color: #333; text-align: center; margin-bottom: 25px; }
+        h2 { margin-top: 0; margin-bottom: 15px; text-align: center; font-size: 1.2em; color: #444; }
+        .attribution { text-align: center; font-size: 1.2em; color: #667; margin-top: -15px; margin-bottom: 25px; }
+        .attribution .heart { display: inline-block; vertical-align: middle; }
+        .attribution .dev-logo-img { display: inline-block; width: 1.5em; height: auto; vertical-align: middle; margin: 0 0.2em; position: relative; top: -0.1em; }
+        .main-container { display: flex; justify-content: space-around; align-items: center; width: 95%; max-width: 1100px; gap: 30px; margin-top: 20px; flex-wrap: wrap; }
+        .sketch-area, .output-container { display: flex; flex-direction: column; align-items: center; width: auto; flex-basis: 512px; flex-grow: 0; box-sizing: border-box; }
+        .canvas-wrapper, .output-video-wrapper {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #e9e9e9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background-color: #fff;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        canvas.erase-mode { cursor: cell; }
+        .output-video-wrapper video { width: 100%; height: 100%; display: block; }
+        .output-video-wrapper .placeholder, .output-video-wrapper .output-error {
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            color: #888;
+            text-align: center;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+        .output-video-wrapper .output-error { color: red; font-weight: bold; word-break: break-word; }
+        .canvas-controls-container { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 25px; margin-bottom: 15px; flex-wrap: wrap; padding: 10px; background-color: #e9e9e9; border-radius: 5px; width: auto; max-width: 90%; }
+        .canvas-controls-container button { padding: 8px 12px; font-size: 0.9em; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background-color: #f8f8f8; }
+        .canvas-controls-container button:hover { background-color: #e0e0e0; border-color: #bbb; }
+        .canvas-controls-container button.active-tool { background-color: #d0e7ff; border-color: #007bff; font-weight: bold; }
+        label { font-size: 0.9em; color: #555; }
+        #colorPicker { width: 40px; height: 30px; border: 1px solid #ccc; padding: 2px; border-radius: 4px; cursor: pointer; background-color: #fff; vertical-align: middle; }
+        
+        /* --- NEW CSS: A small addition for better alignment of the new slider --- */
+        .thickness-control { display: flex; align-items: center; gap: 5px; }
+        .thickness-control input[type="range"] { vertical-align: middle; }
+
+        .prompt-container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 800px; margin-bottom: 15px; }
+        #promptInput { width: 100%; padding: 8px 10px; border: 1px solid #000000; border-radius: 8px; font-size: 1.2em; min-height: 40px; resize: vertical; line-height: 1.4; box-sizing: border-box; }
+        .action-buttons { display: flex; justify-content: center; gap: 15px; width: 100%; margin-top: 0; }
+        .action-buttons button { padding: 12px 20px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 5px; color: white; transition: background-color 0.2s; min-width: 120px; }
+        .action-buttons button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #generateBtn { background-color: #007bff; }
+        #generateBtn:hover:not(:disabled) { background-color: #0056b3; }
+        #clearBtn { background-color: #dc3545; }
+        #clearBtn:hover:not(:disabled) { background-color: #c82333; }
+        .status-area { margin-top: 20px; font-weight: bold; min-height: 1.2em; text-align: center; width: 100%; padding-bottom: 20px; }
+        .status-area.error { color: red; }
+        .status-area.loading { color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Sketch2Video with Gemini & Veo 3</h1> 
+    <h3 class="attribution">
+        Made with <span class="heart">🧡</span> by
+        <img src="{{ url_for('static', filename='images/dev-logo.png') }}" alt="Google Developers logo" class="dev-logo-img">
+        Nitin Tiwari
+    </h2>
+  
+    <div class="main-container">
+        <div class="sketch-area">
+            <h2>Your Sketch</h2>
+            <div class="canvas-wrapper">
+                <canvas id="sketchCanvas" width="512" height="288"></canvas>
+            </div>
+        </div>
+        <div class="output-container">
+             <h2>Generated Video</h2>
+             <div id="outputWrapper" class="output-video-wrapper">
+                 <video id="outputVideo" controls autoplay muted loop playsinline style="display: none;"></video>
+                 <div id="outputPlaceholder" class="placeholder">Video will appear here...</div>
+                 <div id="outputError" class="output-error" style="display: none;"></div>
+             </div>
+        </div>
+    </div>
+
+    <div class="canvas-controls-container">
+        <button id="drawBtn" class="active-tool">Draw</button>
+        <button id="eraseBtn">Erase</button>
+        <label for="colorPicker">Color:</label>
+        <input type="color" id="colorPicker" value="#000000">
+
+        <!-- +++ NEW HTML: Brush thickness slider +++ -->
+        <div class="thickness-control">
+            <label for="thicknessSlider">Thickness:</label>
+            <input type="range" id="thicknessSlider" min="1" max="50" value="3">
+            <span id="thicknessValue">3</span>
+        </div>
+        <!-- +++ END OF NEW HTML +++ -->
+
+    </div>
+    <div class="prompt-container">
+        <textarea id="promptInput" rows="1" placeholder="Describe the video animation (e.g., camera zooms in, car drives away)"></textarea>
+    </div>
+     <div class="action-buttons">
+         <button id="clearBtn">Clear Sketch & Prompt</button> 
+         <button id="generateBtn">Generate Video</button>
+     </div>
+    <div id="status" class="status-area"></div>
+    <script>
+        const promptInput = document.getElementById('promptInput'); 
+        const canvas = document.getElementById('sketchCanvas');
+        const ctx = canvas.getContext('2d');
+        const clearBtn = document.getElementById('clearBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const eraseBtn = document.getElementById('eraseBtn');
+        const drawBtn = document.getElementById('drawBtn');
+        const colorPicker = document.getElementById('colorPicker');
+        
+        // +++ NEW JS: Get the new slider elements +++
+        const thicknessSlider = document.getElementById('thicknessSlider');
+        const thicknessValue = document.getElementById('thicknessValue');
+
+        const outputWrapper = document.getElementById('outputWrapper');
+        const outputVideo = document.getElementById('outputVideo');
+        const outputPlaceholder = document.getElementById('outputPlaceholder');
+        const outputError = document.getElementById('outputError');
+        const statusDiv = document.getElementById('status');
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentMode = 'draw';
+        let drawColor = '#000000';
+
+        // +++ MODIFIED JS: Change drawLineWidth from const to let so it can be updated +++
+        let drawLineWidth = 3; 
+        const eraseLineWidth = 15;
+
+        function initializeCanvas() {
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height); 
+            drawColor = '#000000';
+            colorPicker.value = '#000000';
+            
+            // +++ NEW JS: Reset the slider to its default state +++
+            drawLineWidth = 3;
+            thicknessSlider.value = 3;
+            thicknessValue.textContent = 3;
+
+            setDrawMode(); 
+            outputVideo.style.display = 'none';
+            outputVideo.src = '';
+            outputPlaceholder.style.display = 'flex';
+            outputPlaceholder.textContent = 'Video will appear here...';
+            outputError.style.display = 'none';
+            statusDiv.textContent = '';
+            statusDiv.className = 'status-area';
+            generateBtn.disabled = false;
+            clearBtn.disabled = false;
+            eraseBtn.disabled = false;
+            drawBtn.disabled = false;
+            colorPicker.disabled = false;
+            promptInput.value = '';        
+            promptInput.disabled = false; 
+        }
+
+        function setDrawMode() { currentMode = 'draw'; ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = drawColor; ctx.lineWidth = drawLineWidth; canvas.classList.remove('erase-mode'); drawBtn.classList.add('active-tool'); eraseBtn.classList.remove('active-tool'); }
+        function setEraseMode() { currentMode = 'erase'; ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = eraseLineWidth; canvas.classList.add('erase-mode'); eraseBtn.classList.add('active-tool'); drawBtn.classList.remove('active-tool'); }
+        
+        function getPos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDrawing(e) { if (e.touches) e.preventDefault(); isDrawing = true; const pos = getPos(e); [lastX, lastY] = [pos.x, pos.y]; ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.fillStyle = (currentMode === 'draw') ? ctx.strokeStyle : 'rgba(0,0,0,1)'; ctx.arc(lastX, lastY, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(lastX, lastY); }
+        function draw(e) { if (!isDrawing) return; if (e.touches) e.preventDefault(); const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); [lastX, lastY] = [pos.x, pos.y]; }
+        function stopDrawing() { if (isDrawing) { isDrawing = false; ctx.beginPath();  } }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+        canvas.addEventListener('touchcancel', stopDrawing);
+        
+        clearBtn.addEventListener('click', () => { initializeCanvas(); });
+        drawBtn.addEventListener('click', setDrawMode);
+        eraseBtn.addEventListener('click', setEraseMode);
+        colorPicker.addEventListener('input', (event) => { drawColor = event.target.value; if (currentMode === 'draw') { ctx.strokeStyle = drawColor; } setDrawMode(); });
+        
+        // +++ NEW JS: Event listener for the thickness slider +++
+        thicknessSlider.addEventListener('input', (event) => {
+            // Update the variable, the display number, and the context
+            drawLineWidth = event.target.value;
+            thicknessValue.textContent = drawLineWidth;
+            ctx.lineWidth = drawLineWidth;
+            // For good UX, switch back to draw mode when changing thickness
+            setDrawMode();
+        });
+
+        // The generateBtn logic is unchanged and correct
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.disabled = true; clearBtn.disabled = true; eraseBtn.disabled = true;
+            drawBtn.disabled = true; colorPicker.disabled = true; promptInput.disabled = true;
+            statusDiv.textContent = 'Generating video... this may take a few minutes.';
+            statusDiv.className = 'status-area loading';
+            outputVideo.style.display = 'none';
+            outputError.style.display = 'none';
+            outputPlaceholder.style.display = 'flex';
+            outputPlaceholder.textContent = 'Generating...';
+            const imageDataUrl = canvas.toDataURL('image/png');
+            const userPrompt = promptInput.value.trim();
+            const payload = { image_data: imageDataUrl };
+            if (userPrompt) { payload.prompt = userPrompt; }
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                if (response.ok && result.generated_video_url) {
+                    outputVideo.src = result.generated_video_url;
+                    outputVideo.load();
+                    outputVideo.style.display = 'block';
+                    outputPlaceholder.style.display = 'none';
+                    outputError.style.display = 'none';
+                    statusDiv.textContent = 'Video generated successfully!';
+                    statusDiv.className = 'status-area';
+                } else {
+                    const errorMsg = result.error || response.statusText || `Failed with status ${response.status}`;
+                    console.error('Generation failed:', errorMsg);
+                    statusDiv.textContent = `Error: ${errorMsg}`;
+                    statusDiv.className = 'status-area error';
+                    outputError.textContent = `Generation Failed: ${errorMsg}`;
+                    outputError.style.display = 'flex';
+                    outputPlaceholder.style.display = 'none';
+                    outputVideo.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Network or fetch error:', error);
+                const errorText = `Network error or failed to fetch: ${error.message || String(error)}`;
+                statusDiv.textContent = `Error: ${errorText}`;
+                statusDiv.className = 'status-area error';
+                outputError.textContent = `Error: ${errorText}`;
+                outputError.style.display = 'flex';
+                outputPlaceholder.style.display = 'none';
+                outputVideo.style.display = 'none';
+            } finally {
+                generateBtn.disabled = false; clearBtn.disabled = false; eraseBtn.disabled = false;
+                drawBtn.disabled = false; colorPicker.disabled = false; promptInput.disabled = false;
+            }
+        });
+        window.onload = initializeCanvas;
+    </script>
+</body>
+</html>
