@@ -5,7 +5,7 @@ This repository is an implementation of converting sketches into lively videos u
 
 1. Google Cloud SDK [(gcloud CLI)](https://cloud.google.com/sdk/docs/install) installed for authentication.
 2. Access to Veo 3.
-   > [!NOTE]  
+   > **NOTE**
    > Veo 3 is still in limited preview.
 
 ## Run the Web App:
