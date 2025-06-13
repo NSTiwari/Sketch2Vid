@@ -1,0 +1,6 @@
+google-genai
+Pillow
+Flask
+python-dotenv
+google-cloud-storage
+google-cloud-aiplatform
