@@ -4,7 +4,9 @@ This repository is an implementation of converting sketches into lively videos u
 ## Pre-requisites:
 
 1. Google Cloud SDK [(gcloud CLI)](https://cloud.google.com/sdk/docs/install) installed for authentication.
-2. Access to Veo 3.
+   a. Go to terminal/command prompt and enter the command: `gcloud init` and choose the project ID.
+   b. Enter the following commandg to set a default login: `gcloud auth application-default login`.
+3. Access to Veo 3.
    > **NOTE**
    > Veo 3 is still in limited preview.
 
