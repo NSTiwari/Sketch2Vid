@@ -28,4 +28,4 @@ This repository is an implementation of converting sketches into lively videos u
 # Acknowledgment:
 <img src="https://github.com/NSTiwari/Sketch2Vid/blob/main/static/images/dev-logo.png">
 
-This project was developed as part of Google's AI Developer Programs AI sprint. Thanks to the AIDP Team for their generous support in providing GCP credits to help facilitate this project.
+This project was developed as part of Google's AI Developer Programs AI Sprint. Thanks to the AIDP Team for their generous support in providing GCP credits to help facilitate this project.
